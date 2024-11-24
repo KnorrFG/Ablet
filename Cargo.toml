@@ -1,0 +1,9 @@
+[package]
+name = "ablet"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nonempty = "0.10.0"
+persistent-structs = "0.1.1"
+termcolor = "1.4.1"

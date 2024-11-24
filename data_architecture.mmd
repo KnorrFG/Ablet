@@ -1,0 +1,44 @@
+classDiagram
+    class Ablet
+    class AbletState
+    class Layout
+    class LItem
+    class Elem
+    class ElemHandleT
+    class Layout
+    class Buffer
+    class Separator
+    class ElemHandle
+    class ElemHandleT
+    class DocBuffer
+    class RawBuffer
+    class InputLineBuffer
+    class Doc
+    class DocData
+    class Separator
+
+    Ablet o-- AbletState
+    AbletState o-- Layout
+    Layout o-- "*" LItem
+    LItem o-- Elem
+    Elem --> Layout
+    Elem --> Buffer
+    Elem --> Separator
+    Buffer --> DocBuffer
+    Buffer --> RawBuffer
+    Buffer --> InputLineBuffer
+
+    DocBuffer o-- Doc
+    RawBuffer o-- Doc
+    Doc *-- DocData
+
+    ElemHandle --> ElemHandleT
+    ElemHandleT --> LayoutHandle
+    ElemHandleT --> DocBufferHandle
+    ElemHandleT --> RawBufferHandle
+    ElemHandleT --> InputLineBufferHandle
+
+    LayoutHandle o-- Layout
+    DocBufferHandle o-- DocBuffer
+    RawBufferHandle o-- RawBuffer
+    InputLineBufferHandle o-- InputLineBuffer
