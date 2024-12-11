@@ -1,4 +1,8 @@
-use std::sync::{Arc, Mutex, RwLock};
+use std::{
+    collections::HashMap,
+    io, iter,
+    sync::{Arc, Mutex, RwLock},
+};
 
 use nonempty::{nonempty, NonEmpty};
 use persistent_structs::PersistentStruct;
@@ -41,12 +45,10 @@ impl Ablet {
             prompt: shared(Prompt {
                 buffer: prompt_buffer_ref,
             }),
-            split_tree: shared(SplitTree {
-                root: Split {
-                    proportion: 1.,
-                    content: SplitContent::Leaf(default_buffer_ref),
-                },
-            }),
+            split_tree: shared(SplitTree::new(
+                Split::new(vec![1], vec![SplitContent::Leaf(default_buffer_ref)]),
+                Orientation::Vertical,
+            )),
             buffers: vec![prompt_buffer, default_buffer],
             documents: vec![prompt_doc, default_buffer_doc],
         }
@@ -58,6 +60,12 @@ impl Ablet {
 
     pub fn default_document_get(&self) -> DocumentRef {
         DocumentRef(self.documents[1].clone())
+    }
+
+    pub fn render(&self) -> io::Result<()> {
+        let term_size = crossterm::terminal::size()?;
+        let rect_map = self.split_tree.lock().unwrap().compute_rects(term_size);
+        Ok(())
     }
 }
 
@@ -126,26 +134,22 @@ struct Prompt {
     buffer: BufferRef,
 }
 
-/// How window is subdivided into splits.
-///
-/// Split tree is n-ary (three side-by-side columns are one level in the tree).
-///
-/// Direction is implicit: `vec![Leaf, Leaf]` is vertical split, `vec![vec![Leaf, Leaf]]` is
-/// horizontal
-///
-/// Splits are ephemeral --- there are no SplitRefs, you can get-set the whole tree at once.
-struct SplitTree {
-    root: Split,
+#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct Rect {
+    pos: BufferPosition,
+    size: Size,
 }
 
-struct Split {
-    proportion: f32,
-    content: SplitContent,
+#[derive(Hash, Clone, Copy, PersistentStruct, PartialEq, Eq, Debug, PartialOrd, Ord)]
+struct Size {
+    w: u16,
+    h: u16,
 }
 
-enum SplitContent {
-    Leaf(BufferRef),
-    Branch(Vec<Split>), // Even branches are v-splits, odd are h-splits.
+impl From<(u16, u16)> for Size {
+    fn from((w, h): (u16, u16)) -> Self {
+        Self { w, h }
+    }
 }
 
 /// A Buffer is its textual content plus extra state, notably, cursors.
@@ -200,10 +204,16 @@ struct Range<T> {
 #[derive(Default)]
 struct TextPosition(usize);
 
-#[derive(Default)]
+#[derive(Default, Hash, Clone, Copy, PersistentStruct, PartialEq, Eq, Debug, PartialOrd, Ord)]
 struct BufferPosition {
-    row: usize,
-    col: usize,
+    row: u16,
+    col: u16,
+}
+
+impl BufferPosition {
+    pub fn new(row: u16, col: u16) -> Self {
+        Self { row, col }
+    }
 }
 
 #[derive(Default)]
@@ -234,5 +244,23 @@ pub enum BufferType {
     Fancy,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Orientation {
+    Horizontal,
+    Vertical,
+}
+
+impl Orientation {
+    pub fn flip(&self) -> Self {
+        match self {
+            Orientation::Horizontal => Self::Vertical,
+            Orientation::Vertical => Self::Horizontal,
+        }
+    }
+}
+
 mod termutils;
 pub use termutils::{with_setup_terminal, SetupError};
+
+mod splittree;
+pub use splittree::{Split, SplitContent, SplitMap, SplitTree};

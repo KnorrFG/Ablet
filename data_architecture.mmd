@@ -1,44 +1,49 @@
 classDiagram
-    class Ablet
-    class AbletState
-    class Layout
-    class LItem
-    class Elem
-    class ElemHandleT
-    class Layout
-    class Buffer
-    class Separator
-    class ElemHandle
-    class ElemHandleT
-    class DocBuffer
-    class RawBuffer
-    class InputLineBuffer
-    class Doc
-    class DocData
-    class Separator
+    class Split {
+        proprtion: f32
+    }
 
-    Ablet o-- AbletState
-    AbletState o-- Layout
-    Layout o-- "*" LItem
-    LItem o-- Elem
-    Elem --> Layout
-    Elem --> Buffer
-    Elem --> Separator
-    Buffer --> DocBuffer
-    Buffer --> RawBuffer
-    Buffer --> InputLineBuffer
+    class Leaf {
+        buffer: BufferRef
+    }
 
-    DocBuffer o-- Doc
-    RawBuffer o-- Doc
-    Doc *-- DocData
+    class RawView {
+        cursor: BufferPosition
+        selections: Vec BufferPosSelection
+    }
+        
+    class FancyView {
+        cursor: TextPosition
+        selections: Vec TextPosSelection
+        linewrap: bool
+        offset: usize
+    }
 
-    ElemHandle --> ElemHandleT
-    ElemHandleT --> LayoutHandle
-    ElemHandleT --> DocBufferHandle
-    ElemHandleT --> RawBufferHandle
-    ElemHandleT --> InputLineBufferHandle
+    class AText {
+        text: String
+        style_map: Vec Option usize
+        styles: Vec termcolorColorSpec
+    }
 
-    LayoutHandle o-- Layout
-    DocBufferHandle o-- DocBuffer
-    RawBufferHandle o-- RawBuffer
-    InputLineBufferHandle o-- InputLineBuffer
+    Ablet o-- Prompt
+    Ablet o-- SplitTree
+    Ablet o-- "*" Buffer
+    Ablet o-- "*" Document
+
+    SplitTree o-- Split
+    Split o-- SplitContent
+    SplitContent --> Leaf
+    SplitContent --> Branch
+    Branch o-- Split
+
+    Buffer o-- DocumentRef
+    Buffer o-- View
+
+    View --> RawView
+    View --> FancyView
+
+    Document o-- AText
+
+    Prompt o-- BufferRef
+    
+
