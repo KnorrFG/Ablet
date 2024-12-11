@@ -130,18 +130,18 @@ impl DocumentRef {
 /// Prompt is a special singleton split used for the primary interraction with the user.
 /// Think command palette, `M-x`, or, indeed, shell's prompt. Maybe we want to display it at the
 /// bottom, like in Emacs, or maybe we want to popup it front and center.
-struct Prompt {
+pub struct Prompt {
     buffer: BufferRef,
 }
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct Rect {
+pub struct Rect {
     pos: BufferPosition,
     size: Size,
 }
 
 #[derive(Hash, Clone, Copy, PersistentStruct, PartialEq, Eq, Debug, PartialOrd, Ord)]
-struct Size {
+pub struct Size {
     w: u16,
     h: u16,
 }
@@ -156,12 +156,12 @@ impl From<(u16, u16)> for Size {
 /// Do cursors belong in the core model? I think so, they are the primary means of interaction.
 /// Though, it's a bit hard to see how to make Vim vs Emacs bindings customizable without
 /// hard-coding?
-struct Buffer {
+pub struct Buffer {
     document: DocumentRef,
     view: View,
 }
 
-enum View {
+pub enum View {
     Raw(RawView),
     Fancy(FancyView),
 }
@@ -183,7 +183,7 @@ struct RawView {
 }
 
 #[derive(Default)]
-struct FancyView {
+pub struct FancyView {
     selections: Vec<Selection<TextPosition>>,
     linewrap: bool,
     /// The offset is a character position in a documents text.
@@ -192,20 +192,20 @@ struct FancyView {
     cursor: TextPosition,
 }
 
-struct Selection<T> {
+pub struct Selection<T> {
     range: Range<T>,
 }
 
-struct Range<T> {
+pub struct Range<T> {
     start: T,
     end: T,
 }
 
 #[derive(Default)]
-struct TextPosition(usize);
+pub struct TextPosition(usize);
 
 #[derive(Default, Hash, Clone, Copy, PersistentStruct, PartialEq, Eq, Debug, PartialOrd, Ord)]
-struct BufferPosition {
+pub struct BufferPosition {
     row: u16,
     col: u16,
 }

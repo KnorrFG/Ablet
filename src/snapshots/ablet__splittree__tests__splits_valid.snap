@@ -16,16 +16,16 @@ expression: rects
     Rect {
         pos: BufferPosition {
             row: 0,
-            col: 20,
+            col: 21,
         },
         size: Size {
-            w: 20,
+            w: 19,
             h: 26,
         },
     },
     Rect {
         pos: BufferPosition {
-            row: 26,
+            row: 27,
             col: 0,
         },
         size: Size {

@@ -18,7 +18,11 @@ pub struct SplitTree {
     top_orientation: Orientation,
 }
 
-pub type SplitMap = HashMap<Rect, BufferRef>;
+pub struct SplitMap {
+    rects: HashMap<Rect, BufferRef>,
+    border_map: BorderMap,
+    size: Size,
+}
 
 impl SplitTree {
     const MIN_SPLIT_SIZE: Size = Size { w: 1, h: 1 };
@@ -35,6 +39,47 @@ impl SplitTree {
             self.top_orientation,
         )
     }
+}
+
+pub struct BorderMap(Vec<Vec<BorderInfo>>);
+impl BorderMap {
+    pub fn new(size: Size) -> Self {
+        Self(vec![vec![BorderInfo::default(); size.w as _]; size.h as _])
+    }
+
+    pub fn size(&self) -> Size {
+        let h = self.0.len() as u16;
+        let w = if h > 0 { self.0[0].len() as u16 } else { 0 };
+        Size { w, h }
+    }
+
+    pub fn update(&mut self, inner_border_map: BorderMap, pos: BufferPosition) {
+        let inner_size = inner_border_map.size();
+        for row in 0..inner_size.h {
+            for col in 0..inner_size.w {
+                self.0[(row + pos.row) as usize][(col + pos.col) as usize] =
+                    inner_border_map.0[row as usize][col as usize];
+            }
+        }
+    }
+
+    pub fn add_vertical(&mut self, pos: BufferPosition, len: u16) {
+        for i in 0..len {
+            self.0[(pos.row + i) as usize][pos.col as usize].in_vertical_border = true;
+        }
+    }
+
+    pub fn add_horizontal(&mut self, pos: BufferPosition, len: u16) {
+        for i in 0..len {
+            self.0[(pos.row) as usize][(pos.col + i) as usize].in_horizontal_border = true;
+        }
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct BorderInfo {
+    in_vertical_border: bool,
+    in_horizontal_border: bool,
 }
 
 #[derive(Constructor)]
@@ -64,35 +109,83 @@ impl Split {
         };
 
         // iter over content to compute the split rects
-        let mut res = HashMap::new();
+        let mut rects = HashMap::new();
+        let mut border_map = BorderMap::new(rect.size);
         let mut current_offset = 0u16;
-        for (content, fraction) in self.content.iter().zip(fractions) {
-            let size = size_by_frac(fraction);
-            let pos = position_by_offset(current_offset);
+        for (i, (content, fraction)) in self.content.iter().zip(fractions).enumerate() {
+            let mut elem_size = size_by_frac(fraction);
+            let mut elem_pos = position_by_offset(current_offset);
 
-            if size.w < min_split_size.w || size.h < min_split_size.h {
-                return None;
+            // because of how float to unsigned conversions work, the actual space used will be less or equal to
+            // the available space, so if we're at the last element, we add the remaining space
+            if i == self.content.len() - 1 {
+                match orientation {
+                    Orientation::Horizontal => {
+                        let dead_space = rect.size.w - (current_offset + elem_size.w);
+                        elem_size.w += dead_space;
+                    }
+                    Orientation::Vertical => {
+                        let dead_space = rect.size.h - (current_offset + elem_size.h);
+                        elem_size.h += dead_space;
+                    }
+                }
             }
 
             // update offset depending on orientation
             current_offset += match orientation {
-                Orientation::Horizontal => size.w,
-                Orientation::Vertical => size.h,
+                Orientation::Horizontal => elem_size.w,
+                Orientation::Vertical => elem_size.h,
             };
 
-            let rect = Rect { pos, size };
+            // for all elems but the first we add a border between the current and the last elem
+            // and cut of the first row/col of the current elem for that
+            if i > 0 {
+                match orientation {
+                    Orientation::Horizontal => {
+                        border_map.add_vertical(elem_pos, elem_size.h);
+                        elem_pos.col += 1;
+                        elem_size.w -= 1;
+                    }
+                    Orientation::Vertical => {
+                        border_map.add_horizontal(elem_pos, elem_size.w);
+                        elem_pos.row += 1;
+                        elem_size.h -= 1;
+                    }
+                };
+            }
+
+            // make sure there is enought space for the elem
+            if elem_size.w < min_split_size.w || elem_size.h < min_split_size.h {
+                return None;
+            }
+
+            let rect = Rect {
+                pos: elem_pos,
+                size: elem_size,
+            };
+
+            // now we know the contents rect, so lets process the content
             match content {
                 SplitContent::Leaf(buffer) => {
-                    res.insert(rect, buffer.clone());
+                    rects.insert(rect, buffer.clone());
                 }
-                SplitContent::Branch(next_split) => res.extend(
-                    next_split
-                        .compute_rects(rect, min_split_size, orientation.flip())?
-                        .into_iter(),
-                ),
+                SplitContent::Branch(next_split) => {
+                    let SplitMap {
+                        rects: inner_rects,
+                        border_map: inner_border_map,
+                        size: inner_size,
+                    } = next_split.compute_rects(rect, min_split_size, orientation.flip())?;
+                    border_map.update(inner_border_map, rect.pos);
+                    rects.extend(inner_rects.into_iter())
+                }
             }
         }
-        Some(res)
+
+        Some(SplitMap {
+            rects,
+            border_map,
+            size: rect.size,
+        })
     }
 }
 
@@ -167,12 +260,12 @@ mod tests {
             }
         };
 
-        let Some(rects) = tree.compute_rects((40, 40)) else {
+        let Some(split_map) = tree.compute_rects((40, 40)) else {
             assert!(false, "unexpected None");
             return;
         };
 
-        let mut rects = rects.keys().collect::<Vec<_>>();
+        let mut rects = split_map.rects.keys().collect::<Vec<_>>();
         rects.sort_unstable();
 
         insta::assert_debug_snapshot!(rects);
