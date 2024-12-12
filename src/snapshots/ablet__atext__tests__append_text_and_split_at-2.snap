@@ -1,0 +1,35 @@
+---
+source: src/atext.rs
+expression: l
+---
+Some(
+    AText {
+        text: "hello be",
+        style_map: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(
+                0,
+            ),
+            Some(
+                0,
+            ),
+        ],
+        styles: [
+            ContentStyle {
+                foreground_color: Some(
+                    Green,
+                ),
+                background_color: None,
+                underline_color: None,
+                attributes: Attributes(
+                    0,
+                ),
+            },
+        ],
+    },
+)

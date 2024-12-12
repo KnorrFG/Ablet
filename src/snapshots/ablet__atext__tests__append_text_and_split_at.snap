@@ -1,0 +1,80 @@
+---
+source: src/atext.rs
+expression: foo
+---
+AText {
+    text: "hello beautiful World",
+    style_map: [
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        None,
+        Some(
+            1,
+        ),
+        Some(
+            1,
+        ),
+        Some(
+            1,
+        ),
+        Some(
+            1,
+        ),
+        Some(
+            1,
+        ),
+    ],
+    styles: [
+        ContentStyle {
+            foreground_color: Some(
+                Green,
+            ),
+            background_color: None,
+            underline_color: None,
+            attributes: Attributes(
+                0,
+            ),
+        },
+        ContentStyle {
+            foreground_color: Some(
+                Blue,
+            ),
+            background_color: None,
+            underline_color: None,
+            attributes: Attributes(
+                0,
+            ),
+        },
+    ],
+}

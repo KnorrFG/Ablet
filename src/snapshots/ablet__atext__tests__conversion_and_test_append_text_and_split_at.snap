@@ -1,0 +1,16 @@
+---
+source: src/atext.rs
+expression: foo
+---
+AText {
+    text: "hello ",
+    style_map: [
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    ],
+    styles: [],
+}

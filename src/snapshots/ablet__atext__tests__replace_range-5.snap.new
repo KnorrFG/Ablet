@@ -1,0 +1,22 @@
+---
+source: src/atext.rs
+assertion_line: 305
+expression: foo
+snapshot_kind: text
+---
+AText {
+    text: "Oh, Hello!",
+    style_map: [
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    ],
+    styles: [],
+}

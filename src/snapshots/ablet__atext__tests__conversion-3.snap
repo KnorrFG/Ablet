@@ -1,0 +1,30 @@
+---
+source: src/atext.rs
+expression: "AText::from(\"foo\".green())"
+---
+AText {
+    text: "foo",
+    style_map: [
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+        Some(
+            0,
+        ),
+    ],
+    styles: [
+        ContentStyle {
+            foreground_color: Some(
+                Green,
+            ),
+            background_color: None,
+            underline_color: None,
+            attributes: Attributes(
+                0,
+            ),
+        },
+    ],
+}

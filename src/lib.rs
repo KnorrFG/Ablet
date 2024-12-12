@@ -40,52 +40,6 @@ impl From<(u16, u16)> for Size {
     }
 }
 
-#[derive(Default)]
-pub struct AText {
-    pub(crate) text: String,
-    pub(crate) style_map: Vec<Option<usize>>,
-    pub(crate) styles: Vec<crossterm::style::ContentStyle>,
-}
-
-impl AText {
-    /// returns a list of pairs (range, style) that fall within the given
-    /// range
-    fn get_range_style_pairs(&self, r: Range<u16>) -> Vec<StyledRange<u16>> {
-        let mut res = vec![];
-        let mut start = r.start;
-        let styles_in_range = self.style_map[r.into_native()].chunk_by(|a, b| a == b);
-        for chunk in styles_in_range {
-            let end = start + chunk.len() as u16;
-            assert!(
-                chunk.len() > 0,
-                "unexpected zero-len chunk in get_range_style_pairs"
-            );
-            let style = chunk[0];
-            res.push(StyledRange {
-                style: if let Some(style) = style {
-                    Cow::Borrowed(&self.styles[style])
-                } else {
-                    Cow::Owned(ContentStyle::default())
-                },
-                range: Range { start, end },
-            });
-            start = end;
-        }
-        res
-    }
-}
-
-impl<T: AsRef<str>> From<T> for AText {
-    fn from(value: T) -> Self {
-        let v = value.as_ref();
-        AText {
-            text: v.into(),
-            style_map: vec![None; v.len()],
-            styles: vec![],
-        }
-    }
-}
-
 pub enum BufferType {
     Raw,
     Fancy,
@@ -170,6 +124,15 @@ impl<T: RangeCompatibleNumber<T>> Range<T> {
     }
 }
 
+impl<T: RangeCompatibleNumber<T>> From<std::ops::Range<T>> for Range<T> {
+    fn from(value: std::ops::Range<T>) -> Self {
+        Self {
+            start: value.start,
+            end: value.end,
+        }
+    }
+}
+
 pub fn range<T: RangeCompatibleNumber<T>>(start: T, end: T) -> Range<T> {
     Range { start, end }
 }
@@ -224,3 +187,6 @@ pub use document::{Document, DocumentRef};
 
 mod buffer;
 pub use buffer::{Buffer, BufferPosition, BufferRef, View};
+
+mod atext;
+pub use atext::AText;

@@ -1,0 +1,13 @@
+---
+source: src/atext.rs
+expression: "AText::from(\"foo\")"
+---
+AText {
+    text: "foo",
+    style_map: [
+        None,
+        None,
+        None,
+    ],
+    styles: [],
+}
