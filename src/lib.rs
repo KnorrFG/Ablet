@@ -1,130 +1,18 @@
 use std::{
-    collections::HashMap,
-    io, iter,
-    sync::{Arc, Mutex, RwLock},
+    borrow::Cow,
+    ops::Sub,
+    sync::{Arc, Mutex},
 };
 
-use nonempty::{nonempty, NonEmpty};
+use crossterm::style::ContentStyle;
+use derive_more::derive::Constructor;
+use itertools::Itertools;
 use persistent_structs::PersistentStruct;
-// User Access to the elems only goes through the handles.
 
 type Shared<T> = Arc<Mutex<T>>;
 
 fn shared<T>(t: T) -> Arc<Mutex<T>> {
     Arc::new(Mutex::new(t))
-}
-
-#[derive(Clone)]
-pub struct Ablet {
-    prompt: Shared<Prompt>,
-    split_tree: Shared<SplitTree>,
-    buffers: Vec<Shared<Buffer>>,
-    documents: Vec<Shared<Document>>,
-}
-
-impl Ablet {
-    pub fn new(buf_type: BufferType) -> Self {
-        let prompt_doc = shared(Document::default());
-        let default_buffer_doc = shared(Document::default());
-        let default_buffer_view = match buf_type {
-            BufferType::Raw => View::raw(),
-            BufferType::Fancy => View::fancy(),
-        };
-        let prompt_buffer = shared(Buffer {
-            document: DocumentRef(prompt_doc.clone()),
-            view: View::fancy(),
-        });
-        let default_buffer = shared(Buffer {
-            document: DocumentRef(default_buffer_doc.clone()),
-            view: default_buffer_view,
-        });
-        let prompt_buffer_ref = BufferRef(prompt_buffer.clone());
-        let default_buffer_ref = BufferRef(default_buffer.clone());
-
-        Self {
-            prompt: shared(Prompt {
-                buffer: prompt_buffer_ref,
-            }),
-            split_tree: shared(SplitTree::new(
-                Split::new(vec![1], vec![SplitContent::Leaf(default_buffer_ref)]),
-                Orientation::Vertical,
-            )),
-            buffers: vec![prompt_buffer, default_buffer],
-            documents: vec![prompt_doc, default_buffer_doc],
-        }
-    }
-
-    pub fn default_buffer_get(&self) -> BufferRef {
-        BufferRef(self.buffers[1].clone())
-    }
-
-    pub fn default_document_get(&self) -> DocumentRef {
-        DocumentRef(self.documents[1].clone())
-    }
-
-    pub fn render(&self) -> io::Result<()> {
-        let term_size = crossterm::terminal::size()?;
-        let rect_map = self.split_tree.lock().unwrap().compute_rects(term_size);
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct BufferRef(Shared<Buffer>);
-
-#[derive(Clone)]
-pub struct DocumentRef(Shared<Document>);
-
-impl DocumentRef {
-    pub fn add_line<T: Into<AText>>(&self, t: T) {
-        let AText {
-            text,
-            mut style_map,
-            styles,
-        } = t.into();
-        let mut this = self.0.lock().unwrap();
-        let my_styles = &mut this.content.styles;
-
-        // check whether any of the styles of the new text are already in
-        // this docs styles, if so, store the index
-        let style_mapping = styles
-            .iter()
-            .map(|new_style| {
-                my_styles.iter().enumerate().find_map(|(i, my_style)| {
-                    if my_style == new_style {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect::<Vec<_>>();
-
-        // if a style is missing, add it to this docs style table, and insert its index.
-        let style_mapping = style_mapping
-            .iter()
-            .enumerate()
-            .map(|(entry_i, entry_mapping)| {
-                if let Some(i) = entry_mapping {
-                    *i
-                } else {
-                    let new_mapping = my_styles.len();
-                    my_styles.push(styles[entry_i].clone());
-                    new_mapping
-                }
-            })
-            .collect::<Vec<_>>();
-
-        // update the new texts style map to point to the styles in this doc
-        for si in &mut style_map {
-            *si = si.map(|i| style_mapping[i])
-        }
-
-        this.content.text.push_str(&text);
-        this.content.style_map.append(&mut style_map);
-        this.content.text.push('\n');
-        this.content.style_map.push(None);
-    }
 }
 
 /// Prompt is a special singleton split used for the primary interraction with the user.
@@ -136,14 +24,14 @@ pub struct Prompt {
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Rect {
-    pos: BufferPosition,
-    size: Size,
+    pub pos: BufferPosition,
+    pub size: Size,
 }
 
 #[derive(Hash, Clone, Copy, PersistentStruct, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Size {
-    w: u16,
-    h: u16,
+    pub w: u16,
+    pub h: u16,
 }
 
 impl From<(u16, u16)> for Size {
@@ -152,80 +40,39 @@ impl From<(u16, u16)> for Size {
     }
 }
 
-/// A Buffer is its textual content plus extra state, notably, cursors.
-/// Do cursors belong in the core model? I think so, they are the primary means of interaction.
-/// Though, it's a bit hard to see how to make Vim vs Emacs bindings customizable without
-/// hard-coding?
-pub struct Buffer {
-    document: DocumentRef,
-    view: View,
-}
-
-pub enum View {
-    Raw(RawView),
-    Fancy(FancyView),
-}
-
-impl View {
-    pub fn fancy() -> Self {
-        Self::Fancy(FancyView::default())
-    }
-
-    pub fn raw() -> Self {
-        Self::Raw(RawView::default())
-    }
-}
-
-#[derive(Default)]
-struct RawView {
-    cursor: BufferPosition,
-    selections: Vec<Selection<BufferPosition>>,
-}
-
-#[derive(Default)]
-pub struct FancyView {
-    selections: Vec<Selection<TextPosition>>,
-    linewrap: bool,
-    /// The offset is a character position in a documents text.
-    /// It MUST point to the beginning of a line
-    offset: usize,
-    cursor: TextPosition,
-}
-
-pub struct Selection<T> {
-    range: Range<T>,
-}
-
-pub struct Range<T> {
-    start: T,
-    end: T,
-}
-
-#[derive(Default)]
-pub struct TextPosition(usize);
-
-#[derive(Default, Hash, Clone, Copy, PersistentStruct, PartialEq, Eq, Debug, PartialOrd, Ord)]
-pub struct BufferPosition {
-    row: u16,
-    col: u16,
-}
-
-impl BufferPosition {
-    pub fn new(row: u16, col: u16) -> Self {
-        Self { row, col }
-    }
-}
-
-#[derive(Default)]
-pub struct Document {
-    content: AText,
-}
-
 #[derive(Default)]
 pub struct AText {
-    text: String,
-    style_map: Vec<Option<usize>>,
-    styles: Vec<termcolor::ColorSpec>,
+    pub(crate) text: String,
+    pub(crate) style_map: Vec<Option<usize>>,
+    pub(crate) styles: Vec<crossterm::style::ContentStyle>,
+}
+
+impl AText {
+    /// returns a list of pairs (range, style) that fall within the given
+    /// range
+    fn get_range_style_pairs(&self, r: Range<u16>) -> Vec<StyledRange<u16>> {
+        let mut res = vec![];
+        let mut start = r.start;
+        let styles_in_range = self.style_map[r.into_native()].chunk_by(|a, b| a == b);
+        for chunk in styles_in_range {
+            let end = start + chunk.len() as u16;
+            assert!(
+                chunk.len() > 0,
+                "unexpected zero-len chunk in get_range_style_pairs"
+            );
+            let style = chunk[0];
+            res.push(StyledRange {
+                style: if let Some(style) = style {
+                    Cow::Borrowed(&self.styles[style])
+                } else {
+                    Cow::Owned(ContentStyle::default())
+                },
+                range: Range { start, end },
+            });
+            start = end;
+        }
+        res
+    }
 }
 
 impl<T: AsRef<str>> From<T> for AText {
@@ -259,8 +106,121 @@ impl Orientation {
     }
 }
 
+trait RangeCompatibleNumber<T>: Copy + Sub<T, Output = T> + PartialOrd + Into<usize> {}
+
+impl<T: Copy + Sub<T, Output = T> + PartialOrd + Into<usize>> RangeCompatibleNumber<T> for T {}
+
+#[derive(Debug, Clone, Copy, PartialEq, PersistentStruct, Constructor)]
+pub struct Range<T> {
+    start: T,
+    end: T,
+}
+
+impl<T: RangeCompatibleNumber<T>> Range<T> {
+    pub fn shortened_to(&self, w: T) -> Self {
+        if self.len() > w {
+            self.update_end(|e| e - (self.len() - w))
+        } else {
+            *self
+        }
+    }
+
+    pub fn len(&self) -> T {
+        self.end - self.start
+    }
+
+    pub fn into_native(self) -> std::ops::Range<usize> {
+        self.start.into()..self.end.into()
+    }
+
+    pub fn get_overlap_with(&self, foreign: &Range<T>) -> OverlapDescription<T> {
+        if foreign.start > self.end || self.start > foreign.end {
+            return OverlapDescription::None;
+        }
+
+        if self.start < foreign.start {
+            if foreign.end >= self.end {
+                OverlapDescription::Right {
+                    old: range(self.start, foreign.start),
+                    foreign: range(foreign.start, self.end),
+                }
+            } else {
+                OverlapDescription::Inner {
+                    old_l: range(self.start, foreign.start),
+                    foreign: range(foreign.start, foreign.end),
+                    old_r: range(foreign.end, self.end),
+                }
+            }
+        } else {
+            // foreign.start <= self.start
+            if foreign.end < self.end {
+                OverlapDescription::Left {
+                    foreign: range(self.start, foreign.end),
+                    old: range(foreign.end, self.end),
+                }
+            } else {
+                // foreign.end >= self.end
+                OverlapDescription::Complete
+            }
+        }
+    }
+
+    pub fn overlaps(&self, foreign: &Range<T>) -> bool {
+        self.get_overlap_with(foreign) != OverlapDescription::None
+    }
+}
+
+pub fn range<T: RangeCompatibleNumber<T>>(start: T, end: T) -> Range<T> {
+    Range { start, end }
+}
+
+/// Describes how to ranges overlay
+#[derive(Debug, PartialEq)]
+pub enum OverlapDescription<T> {
+    None,
+    Complete,
+
+    /// they overlay so that the foreighn range is overlapping
+    /// the left most part
+    Left {
+        foreign: Range<T>,
+        old: Range<T>,
+    },
+    /// they overlay so that the foreighn range is overlapping
+    /// the right most part
+    Right {
+        old: Range<T>,
+        foreign: Range<T>,
+    },
+    /// they are overlapping so that the foreign range is in
+    /// middle without touching borders
+    Inner {
+        old_l: Range<T>,
+        foreign: Range<T>,
+        old_r: Range<T>,
+    },
+}
+
+#[derive(PersistentStruct, Clone)]
+pub struct StyledRange<'a, T> {
+    pub(crate) style: Cow<'a, crossterm::style::ContentStyle>,
+    pub(crate) range: Range<T>,
+}
+
+#[derive(Default)]
+pub struct TextPosition(usize);
+
 mod termutils;
 pub use termutils::{with_setup_terminal, SetupError};
 
 mod splittree;
 pub use splittree::{Split, SplitContent, SplitMap, SplitTree};
+
+mod ablet_type;
+pub use ablet_type::Ablet;
+
+mod document;
+pub use document::{Document, DocumentRef};
+
+mod buffer;
+pub use buffer::{Buffer, BufferPosition, BufferRef, View};

@@ -19,9 +19,9 @@ pub struct SplitTree {
 }
 
 pub struct SplitMap {
-    rects: HashMap<Rect, BufferRef>,
-    border_map: BorderMap,
-    size: Size,
+    pub(crate) rects: HashMap<Rect, BufferRef>,
+    pub(crate) border_map: BorderMap,
+    pub(crate) size: Size,
 }
 
 impl SplitTree {
@@ -41,7 +41,8 @@ impl SplitTree {
     }
 }
 
-pub struct BorderMap(Vec<Vec<BorderInfo>>);
+pub struct BorderMap(pub(crate) Vec<Vec<BorderInfo>>);
+
 impl BorderMap {
     pub fn new(size: Size) -> Self {
         Self(vec![vec![BorderInfo::default(); size.w as _]; size.h as _])
@@ -78,8 +79,8 @@ impl BorderMap {
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct BorderInfo {
-    in_vertical_border: bool,
-    in_horizontal_border: bool,
+    pub(crate) in_vertical_border: bool,
+    pub(crate) in_horizontal_border: bool,
 }
 
 #[derive(Constructor)]
@@ -173,7 +174,7 @@ impl Split {
                     let SplitMap {
                         rects: inner_rects,
                         border_map: inner_border_map,
-                        size: inner_size,
+                        size: _,
                     } = next_split.compute_rects(rect, min_split_size, orientation.flip())?;
                     border_map.update(inner_border_map, rect.pos);
                     rects.extend(inner_rects.into_iter())

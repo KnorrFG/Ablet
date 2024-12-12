@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 crossterm = "0.28.1"
 derive_more = { version = "1.0.0", features = ["constructor"] }
+itertools = "0.13.0"
 log = "0.4.22"
 nonempty = "0.10.0"
 persistent-structs = "0.1.1"
