@@ -15,12 +15,12 @@ pub struct AText {
 impl AText {
     /// returns a list of pairs (range, style) that fall within the given
     /// range. Assumes self is a single line
-    pub(crate) fn get_range_style_pairs(&self, r: Range<u16>) -> Vec<StyledRange<u16>> {
+    pub(crate) fn get_range_style_pairs(&self, r: Range<usize>) -> Vec<StyledRange<usize>> {
         let mut res = vec![];
         let mut start = r.start;
         let styles_in_range = self.style_map[r.into_native()].chunk_by(|a, b| a == b);
         for chunk in styles_in_range {
-            let end = start + chunk.len() as u16;
+            let end = start + chunk.len();
             assert!(
                 chunk.len() > 0,
                 "unexpected zero-len chunk in get_range_style_pairs"

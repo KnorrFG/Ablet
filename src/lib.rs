@@ -1,10 +1,15 @@
 use std::{
     borrow::Cow,
-    ops::Sub,
+    collections::HashSet,
+    io,
+    ops::{RangeBounds, Sub},
     sync::{Arc, Mutex},
 };
 
-use crossterm::style::ContentStyle;
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEvent},
+    style::ContentStyle,
+};
 use derive_more::derive::Constructor;
 use itertools::Itertools;
 use persistent_structs::PersistentStruct;
@@ -19,13 +24,26 @@ fn shared<T>(t: T) -> Arc<Mutex<T>> {
 /// Think command palette, `M-x`, or, indeed, shell's prompt. Maybe we want to display it at the
 /// bottom, like in Emacs, or maybe we want to popup it front and center.
 pub struct Prompt {
-    buffer: BufferRef,
+    pub(crate) buffer: BufferRef,
 }
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Rect {
     pub pos: BufferPosition,
     pub size: Size,
+}
+
+impl Rect {
+    pub fn new(row: u16, col: u16, w: u16, h: u16) -> Self {
+        Self {
+            pos: BufferPosition { row, col },
+            size: Size { w, h },
+        }
+    }
+}
+
+pub fn rect(row: u16, col: u16, w: u16, h: u16) -> Rect {
+    Rect::new(row, col, w, h)
 }
 
 #[derive(Hash, Clone, Copy, PersistentStruct, PartialEq, Eq, Debug, PartialOrd, Ord)]
@@ -60,7 +78,7 @@ impl Orientation {
     }
 }
 
-trait RangeCompatibleNumber<T>: Copy + Sub<T, Output = T> + PartialOrd + Into<usize> {}
+pub trait RangeCompatibleNumber<T>: Copy + Sub<T, Output = T> + PartialOrd + Into<usize> {}
 
 impl<T: Copy + Sub<T, Output = T> + PartialOrd + Into<usize>> RangeCompatibleNumber<T> for T {}
 
@@ -71,6 +89,25 @@ pub struct Range<T> {
 }
 
 impl<T: RangeCompatibleNumber<T>> Range<T> {
+    pub fn split_at_index(self, v: T) -> (Option<Self>, Option<Self>) {
+        if v.into() <= 0 {
+            (None, Some(self))
+        } else if v >= self.end {
+            (Some(self), None)
+        } else {
+            (
+                Some(Self {
+                    start: self.start,
+                    end: v,
+                }),
+                Some(Self {
+                    start: v,
+                    end: self.end,
+                }),
+            )
+        }
+    }
+
     pub fn shortened_to(&self, w: T) -> Self {
         if self.len() > w {
             self.update_end(|e| e - (self.len() - w))
@@ -170,8 +207,15 @@ pub struct StyledRange<'a, T> {
     pub(crate) range: Range<T>,
 }
 
-#[derive(Default)]
-pub struct TextPosition(usize);
+macro_rules! with_cleanup {
+    (cleanup: $cleanup:block, code: $code:block) => {{
+        #[allow(unused_mut)] // its a false positive warning
+        let mut f = move || $code;
+        let res = f();
+        $cleanup;
+        res
+    }};
+}
 
 mod termutils;
 pub use termutils::{with_setup_terminal, SetupError};
@@ -180,7 +224,7 @@ mod splittree;
 pub use splittree::{Split, SplitContent, SplitMap, SplitTree};
 
 mod ablet_type;
-pub use ablet_type::Ablet;
+pub use ablet_type::{Ablet, EventHandler, SimpleLineHandler, SimpleLineHandlerResult};
 
 mod document;
 pub use document::{Document, DocumentRef};

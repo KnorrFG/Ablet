@@ -1,15 +1,17 @@
 use std::io::{self, Write};
 
 use crossterm::{
-    cursor, execute, queue,
+    cursor,
+    event::{self, Event, KeyCode, KeyModifiers},
+    execute, queue,
     style::Print,
     terminal::{Clear, ClearType},
 };
 use itertools::enumerate;
 
 use crate::{
-    shared, Buffer, BufferRef, BufferType, Document, DocumentRef, Orientation, Prompt, Shared,
-    Split, SplitContent, SplitMap, SplitTree, View,
+    rect, shared, Buffer, BufferRef, BufferType, Document, DocumentRef, Orientation, Prompt, Rect,
+    Shared, Split, SplitContent, SplitMap, SplitTree, View,
 };
 
 #[derive(Clone)]
@@ -20,17 +22,44 @@ pub struct Ablet {
     documents: Vec<Shared<Document>>,
 }
 
+pub trait EventHandler<T> {
+    fn handle(&mut self, ev: &Event, buf: &BufferRef) -> Option<T>;
+}
+
+pub struct SimpleLineHandler;
+
+pub enum SimpleLineHandlerResult {
+    LineDone,
+    Abort,
+}
+
+impl EventHandler<SimpleLineHandlerResult> for SimpleLineHandler {
+    fn handle(&mut self, ev: &Event, buf: &BufferRef) -> Option<SimpleLineHandlerResult> {
+        match ev {
+            Event::Key(ke) => match ke.code {
+                KeyCode::Char('c') if ke.modifiers.contains(KeyModifiers::CONTROL) => {
+                    return Some(SimpleLineHandlerResult::Abort);
+                }
+                KeyCode::Char(c) => buf.insert_char_at_cursor(c),
+                KeyCode::Backspace => buf.delete_char_before_cursor(),
+                KeyCode::Enter => return Some(SimpleLineHandlerResult::LineDone),
+                _ => {}
+            },
+            Event::Paste(text) => buf.insert_text_at_cursor(text.as_str()),
+            _ => {}
+        }
+        None
+    }
+}
+
 impl Ablet {
-    pub fn new(buf_type: BufferType) -> Self {
+    pub fn new() -> Self {
         let prompt_doc = shared(Document::default());
         let default_buffer_doc = shared(Document::default());
-        let default_buffer_view = match buf_type {
-            BufferType::Raw => View::raw(),
-            BufferType::Fancy => View::fancy(),
-        };
+        let default_buffer_view = View::default();
         let prompt_buffer = shared(Buffer {
             document: DocumentRef(prompt_doc.clone()),
-            view: View::fancy(),
+            view: View::default(),
         });
         let default_buffer = shared(Buffer {
             document: DocumentRef(default_buffer_doc.clone()),
@@ -61,19 +90,24 @@ impl Ablet {
     }
 
     pub fn render(&self) -> io::Result<()> {
-        let term_size = crossterm::terminal::size()?;
+        let (term_w, term_h) = crossterm::terminal::size()?;
+
         queue!(io::stdout(), Clear(ClearType::All))?;
         let Some(SplitMap {
             rects,
             border_map,
             size,
-        }) = self.split_tree.lock().unwrap().compute_rects(term_size)
+        }) = self
+            .split_tree
+            .lock()
+            .unwrap()
+            .compute_rects((term_w, term_h - 2))
         else {
             return render_screen_too_small_info();
         };
 
         for (rect, buffer) in rects {
-            buffer.render_at(rect, false)?;
+            buffer.render_at(rect)?;
         }
 
         let mut stdout = io::stdout();
@@ -94,11 +128,45 @@ impl Ablet {
                 }
             }
         }
+
+        let prompt_serparator_line = format!("{:\u{2500}<1$}", "", term_w as usize);
+        queue!(
+            stdout,
+            cursor::MoveTo(0, term_h - 2),
+            Print(prompt_serparator_line),
+        )?;
+
+        self.prompt
+            .lock()
+            .unwrap()
+            .buffer
+            .render_at(rect(term_h - 1, 0, term_w, 1))?;
         stdout.flush()
     }
 
     pub fn split_tree_set(&mut self, tree: SplitTree) {
         self.split_tree = shared(tree);
+    }
+
+    pub fn prompt_buffer_get(&self) -> BufferRef {
+        self.prompt.lock().unwrap().buffer.clone()
+    }
+
+    pub fn edit_prompt<H: EventHandler<T>, T>(&self, event_handler: &mut H) -> io::Result<T> {
+        let buf = self.prompt_buffer_get();
+        buf.set_cursor_visible(true);
+        with_cleanup!(
+            cleanup: {self.prompt_buffer_get().set_cursor_visible(false)},
+            code: {
+                loop {
+                    self.render()?;
+                    let ev = event::read()?;
+                    if let Some(res) = event_handler.handle(&ev, &buf) {
+                        return Ok(res);
+                    }
+                }
+            }
+        )
     }
 }
 

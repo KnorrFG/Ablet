@@ -15,14 +15,6 @@ pub enum SetupError<T> {
     #[error("Application Error: {0}")]
     ApplicationError(#[from] T),
 }
-macro_rules! with_cleanup {
-    (cleanup: $cleanup:block, code: $code:block) => {{
-        let f = move || $code;
-        let res = f();
-        $cleanup;
-        res
-    }};
-}
 
 pub fn with_setup_terminal<F, T, E>(f: F) -> Result<T, SetupError<E>>
 where

@@ -9,12 +9,13 @@ The things i wanted to build easily:
 
 ## Next Todos:
 
-- Prompt commands
-  - insert char
-  - delete at end
 
-- Prompt loop
-  - confirm
+- KeyHandler type, basically the closure in edit_prompt, but as a custom trait object.
+  This way we can implement vim vs emacs hotkeys vs user hotkeys, and it should then
+  be a mut ref, I guess, so it can be called again
+- also I guess there is no reason for a special prompt buffer. At least there wont be,
+  if I allow buffers of a fixed height.
+- render something colorful for testing.
 
 ## Developer doku and contributor infos
 
@@ -48,3 +49,11 @@ The things i wanted to build easily:
   - buttons? Special type of attribute? This is a higher level
 
 - 2 modes: event processing, (normal mode) and insert mode
+
+## Things that need to be taken care of
+
+- Inefficiency of AText type
+- selections
+- consider supporting windows line endings, or at least add a warning?
+- the raw view is really just a special case of the fancy view, and
+  it might be a better idea to just have one view type
