@@ -1,136 +1,31 @@
    Compiling ablet v0.1.0 (/home/felix/git/ablet)
-warning: unused import: `collections::HashSet`
- --> src/lib.rs:3:5
-  |
-3 |     collections::HashSet,
-  |     ^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: `#[warn(unused_imports)]` on by default
-
-warning: unused imports: `ContentStyle` and `KeyEvent`
-  --> src/lib.rs:11:35
-   |
-11 |     event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
-   |                                   ^^^^^^^^
-12 |     execute, queue,
-13 |     style::{ContentStyle, Print},
-   |             ^^^^^^^^^^^^
-
-warning: unused import: `zip`
- --> src/splittree.rs:4:23
-  |
-4 | use itertools::{izip, zip, Itertools};
-  |                       ^^^
-
-warning: unused import: `collections::BTreeSet`
- --> src/buffer.rs:3:5
-  |
-3 |     collections::BTreeSet,
-  |     ^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused import: `ops::Index`
- --> src/atext.rs:1:60
-  |
-1 | use std::{borrow::Cow, collections::HashMap, fmt::Display, ops::Index};
-  |                                                            ^^^^^^^^^^
-
-warning: use of deprecated function `itertools::zip`: Use [std::iter::zip](https://doc.rust-lang.org/std/iter/fn.zip.html) instead
- --> src/splittree.rs:4:23
-  |
-4 | use itertools::{izip, zip, Itertools};
-  |                       ^^^
-  |
-  = note: `#[warn(deprecated)]` on by default
-
-warning: unused import: `RangeBounds`
- --> src/lib.rs:5:11
-  |
-5 |     ops::{RangeBounds, Sub},
-  |           ^^^^^^^^^^^
-
-warning: unused import: `Itertools`
-  --> src/lib.rs:17:28
-   |
-17 | use itertools::{enumerate, Itertools};
-   |                            ^^^^^^^^^
-
 warning: unused import: `Write`
- --> src/buffer.rs:4:16
+ --> src/lib.rs:3:16
   |
-4 |     io::{self, Write},
+3 |     io::{self, Write},
   |                ^^^^^
-
-warning: unused variable: `selection`
-   --> src/buffer.rs:259:18
-    |
-259 | fn to_line_range(selection: &Selection<TextPosition>, i: usize, w: usize) -> Option<Range<usize>> {
-    |                  ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_selection`
-    |
-    = note: `#[warn(unused_variables)]` on by default
-
-warning: unused variable: `i`
-   --> src/buffer.rs:259:55
-    |
-259 | fn to_line_range(selection: &Selection<TextPosition>, i: usize, w: usize) -> Option<Range<usize>> {
-    |                                                       ^ help: if this is intentional, prefix it with an underscore: `_i`
-
-warning: unused variable: `w`
-   --> src/buffer.rs:259:65
-    |
-259 | fn to_line_range(selection: &Selection<TextPosition>, i: usize, w: usize) -> Option<Range<usize>> {
-    |                                                                 ^ help: if this is intentional, prefix it with an underscore: `_w`
-
-warning: field `buffer` is never read
-  --> src/lib.rs:30:16
-   |
-29 | pub struct Prompt {
-   |            ------ field in this struct
-30 |     pub(crate) buffer: BufferRef,
-   |                ^^^^^^
-   |
-   = note: `#[warn(dead_code)]` on by default
-
-warning: field `size` is never read
-  --> src/splittree.rs:25:16
-   |
-22 | pub struct SplitMap {
-   |            -------- field in this struct
-...
-25 |     pub(crate) size: Size,
-   |                ^^^^
-
-warning: field `range` is never read
-   --> src/buffer.rs:388:5
-    |
-387 | pub struct Selection<T> {
-    |            --------- field in this struct
-388 |     range: Range<T>,
-    |     ^^^^^
-
-warning: call to `.clone()` on a reference in this situation does nothing
-   --> src/buffer.rs:307:31
-    |
-307 |                     selections.clone(),
-    |                               ^^^^^^^^ help: remove this redundant call
-    |
-    = note: the type `[Range<usize>]` does not implement `Clone`, so calling `clone` on `&[Range<usize>]` copies the reference, which does not do anything and can be removed
-    = note: `#[warn(noop_method_call)]` on by default
-
-warning: `ablet` (lib) generated 16 warnings (run `cargo fix --lib -p ablet` to apply 6 suggestions)
-warning: unused import: `self`
- --> examples/fake_chat.rs:5:12
-  |
-5 |     time::{self, Duration, Instant},
-  |            ^^^^
   |
   = note: `#[warn(unused_imports)]` on by default
 
-warning: unused imports: `Event`, `KeyCode`, and `KeyEvent`
-  --> examples/fake_chat.rs:13:13
+warning: unused imports: `ClearType`, `Clear`, `cursor`, `execute`, `queue`, and `style::Print`
+  --> src/lib.rs:9:5
    |
-13 |     event::{Event, KeyCode, KeyEvent},
-   |             ^^^^^  ^^^^^^^  ^^^^^^^^
+9  |     cursor,
+   |     ^^^^^^
+10 |     event::{self, Event, KeyCode, KeyModifiers},
+11 |     execute, queue,
+   |     ^^^^^^^  ^^^^^
+12 |     style::Print,
+   |     ^^^^^^^^^^^^
+13 |     terminal::{Clear, ClearType},
+   |                ^^^^^  ^^^^^^^^^
 
-warning: `ablet` (example "fake_chat") generated 2 warnings (run `cargo fix --example "fake_chat"` to apply 2 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.50s
+warning: unused import: `itertools::enumerate`
+  --> src/lib.rs:16:5
+   |
+16 | use itertools::enumerate;
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: `ablet` (lib) generated 3 warnings (run `cargo fix --lib -p ablet` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.65s
      Running `target/debug/examples/fake_chat`

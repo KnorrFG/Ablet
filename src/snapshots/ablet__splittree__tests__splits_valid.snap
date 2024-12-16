@@ -10,7 +10,7 @@ expression: rects
         },
         size: Size {
             w: 20,
-            h: 26,
+            h: 25,
         },
     },
     Rect {
@@ -20,17 +20,27 @@ expression: rects
         },
         size: Size {
             w: 19,
-            h: 26,
+            h: 25,
         },
     },
     Rect {
         pos: BufferPosition {
-            row: 27,
+            row: 26,
             col: 0,
         },
         size: Size {
             w: 40,
-            h: 13,
+            h: 12,
+        },
+    },
+    Rect {
+        pos: BufferPosition {
+            row: 39,
+            col: 0,
+        },
+        size: Size {
+            w: 40,
+            h: 1,
         },
     },
 ]

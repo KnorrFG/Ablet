@@ -1,3 +1,8 @@
+//! Contains definitions of a Buffer and related Code
+//!
+//! A buffer is basically a Document and a View, a View contains
+//! Cursors, Selections and Offsets
+
 use std::{
     borrow::Cow,
     io::{self},
@@ -51,6 +56,13 @@ impl BufferRef {
     pub fn move_cursor_by(&self, offset: isize) {
         self.0.lock().unwrap().move_cursor_by(offset)
     }
+    pub fn move_cursor_to_line_start(&self) {
+        self.0.lock().unwrap().move_cursor_to_line_start()
+    }
+
+    pub fn move_cursor_to_line_end(&self) {
+        self.0.lock().unwrap().move_cursor_to_line_end()
+    }
 }
 
 pub struct Buffer {
@@ -59,6 +71,33 @@ pub struct Buffer {
 }
 
 impl Buffer {
+    pub fn move_cursor_to_line_start(&mut self) {
+        let cursor_pos = self.view.cursor.0;
+        self.document.update_content(|c| {
+            let chars = c.text[..cursor_pos].chars().collect::<Vec<_>>();
+            let nl_pos = chars.iter().rposition(|c| *c == '\n');
+
+            if let Some(pos) = nl_pos {
+                self.view.cursor.0 = pos;
+            } else {
+                self.view.cursor.0 = 0;
+            }
+        })
+    }
+
+    pub fn move_cursor_to_line_end(&mut self) {
+        let cursor_pos = self.view.cursor.0;
+        self.document.update_content(|c| {
+            let nl_offset = c.text.chars().dropping(cursor_pos).position(|c| c == '\n');
+
+            if let Some(nl_offset) = nl_offset {
+                self.view.cursor.0 += nl_offset;
+            } else {
+                self.view.cursor.0 = c.len();
+            }
+        })
+    }
+
     pub fn move_cursor_by(&mut self, offset: isize) {
         let pos = self.view.cursor.0 as isize;
         self.view.cursor.0 = (pos + offset)
@@ -334,12 +373,10 @@ fn get_line_ranges(text: &str) -> Vec<Range<usize>> {
 }
 
 #[derive(Default)]
-pub struct View {
+pub(crate) struct View {
     selections: Vec<Selection<TextPosition>>,
     // NOT supported yet
     // linewrap: bool,
-    /// The offset is a character position in a documents text.
-    /// It MUST point to the beginning of a line
     offset: usize,
     cursor: TextPosition,
     cursor_visible: bool,
@@ -353,32 +390,6 @@ pub struct TextPosition(usize);
 pub struct BufferPosition {
     pub row: u16,
     pub col: u16,
-}
-
-impl BufferPosition {
-    pub fn to_text_pos(&self, doc: &Document) -> usize {
-        let mut counter = 0usize;
-
-        // if the cursor is not in the first lines, count the chars in the lines
-        // before the cursor line
-        if self.row > 0 {
-            let mut n_lines_seen = 0;
-            for c in doc.content.text.chars() {
-                counter += 1;
-                if c == '\n' {
-                    n_lines_seen += 1;
-
-                    if n_lines_seen == self.row {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // now the count is at the beginning of the right line, and we only need to add the
-        // col offset
-        counter + self.col as usize
-    }
 }
 
 impl BufferPosition {

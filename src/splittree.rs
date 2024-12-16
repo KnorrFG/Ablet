@@ -1,7 +1,16 @@
-use std::{collections::HashMap, iter};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+    iter,
+};
 
+use crossterm::{
+    cursor, execute, queue,
+    style::Print,
+    terminal::{Clear, ClearType},
+};
 use derive_more::Constructor;
-use itertools::{izip, Itertools};
+use itertools::{enumerate, izip, Itertools};
 
 use crate::{BufferPosition, BufferRef, Orientation, Rect, Size};
 
@@ -19,7 +28,7 @@ pub struct SplitTree {
     top_orientation: Orientation,
 }
 
-pub struct SplitMap {
+pub(crate) struct SplitMap {
     pub(crate) rects: HashMap<Rect, BufferRef>,
     pub(crate) border_map: BorderMap,
 }
@@ -29,7 +38,7 @@ impl SplitTree {
 
     /// Returns a map from rects to buffer refs, unless there is less than MIN_SPLIT_SIZE
     /// cells of space for a rect
-    pub fn compute_rects(&self, term_size: (u16, u16)) -> Option<SplitMap> {
+    pub(crate) fn compute_rects(&self, term_size: (u16, u16)) -> Option<SplitMap> {
         self.root.compute_rects(
             Rect {
                 pos: BufferPosition::new(0, 0),
@@ -38,6 +47,43 @@ impl SplitTree {
             Self::MIN_SPLIT_SIZE,
             self.top_orientation,
         )
+    }
+
+    pub fn render(&self) -> io::Result<()> {
+        let term_size = crossterm::terminal::size()?;
+
+        queue!(io::stdout(), Clear(ClearType::All))?;
+        let Some(SplitMap {
+            rects, border_map, ..
+        }) = self.compute_rects(term_size)
+        else {
+            return render_screen_too_small_info();
+        };
+
+        for (rect, buffer) in rects {
+            buffer.render_at(rect)?;
+        }
+
+        let mut stdout = io::stdout();
+        for (row_i, row) in enumerate(border_map.0) {
+            for (col_i, field) in enumerate(row) {
+                if field.in_vertical_border {
+                    queue!(
+                        stdout,
+                        cursor::MoveTo(col_i as u16, row_i as u16),
+                        Print("\u{2502}")
+                    )?;
+                } else if field.in_horizontal_border {
+                    queue!(
+                        stdout,
+                        cursor::MoveTo(col_i as u16, row_i as u16),
+                        Print("\u{2500}")
+                    )?;
+                }
+            }
+        }
+
+        stdout.flush()
     }
 }
 
@@ -96,7 +142,7 @@ pub struct Split {
 }
 
 impl Split {
-    pub fn compute_rects(
+    pub(crate) fn compute_rects(
         &self,
         rect: Rect,
         min_split_size: Size,
@@ -284,13 +330,27 @@ impl Split {
     }
 }
 
+fn render_screen_too_small_info() -> Result<(), io::Error> {
+    execute!(
+        io::stdout(),
+        cursor::MoveTo(0, 0),
+        Print("The terminal window is too small to render the ui, please enlarge")
+    )
+}
+
 #[derive(Clone)]
 pub enum SplitContent {
     Leaf(BufferRef),
     Branch(Split),
 }
 
-/// Define a split tree
+/// Define a split tree.
+///
+/// The definition starts with a Orientation, then come a list of sizes, a size
+/// can either be proportional, in which case its absolut size is computed based
+/// on the available space, or absolut, when marked with a `!`. Sub splits can
+/// be opened with a pair or braces, and will have the flipped orientation of
+/// the parent
 ///
 /// ```no_run
 /// use ablet::{split_tree, Buffer};
@@ -304,6 +364,7 @@ pub enum SplitContent {
 ///             1: def_buffer,
 ///         },
 ///         1: def_buffer,
+///         1!: def_buffer,
 ///     }
 /// );
 /// ```
@@ -378,6 +439,7 @@ mod tests {
                     1: def_buffer,
                 },
                 1: def_buffer,
+                1!: def_buffer,
             }
         );
 

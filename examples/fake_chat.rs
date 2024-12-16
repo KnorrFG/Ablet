@@ -58,7 +58,7 @@ fn start_background_thread(splits: SplitTree, buf: BufferRef, rx_kill: Receiver<
             let now = Instant::now();
             if now.duration_since(last_msg_ts) > Duration::from_secs(2) {
                 buf.add_line(AText::from("< ".green()) + "Hello at " + format!("{now:?}").yellow());
-                ablet::render(&splits).unwrap();
+                splits.render().unwrap();
                 last_msg_ts = now;
             }
         }

@@ -1,19 +1,12 @@
 use std::{
     borrow::Cow,
-    io::{self, Write},
+    io::{self},
     ops::Sub,
     sync::{Arc, Mutex},
 };
 
-use crossterm::{
-    cursor,
-    event::{self, Event, KeyCode, KeyModifiers},
-    execute, queue,
-    style::Print,
-    terminal::{Clear, ClearType},
-};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use derive_more::derive::Constructor;
-use itertools::enumerate;
 use persistent_structs::PersistentStruct;
 
 type Shared<T> = Arc<Mutex<T>>;
@@ -181,12 +174,14 @@ pub enum OverlapDescription<T> {
         foreign: Range<T>,
         old: Range<T>,
     },
-    /// they overlay so that the foreighn range is overlapping
+
+    /// they overlay so that the foreign range is overlapping
     /// the right most part
     Right {
         old: Range<T>,
         foreign: Range<T>,
     },
+
     /// they are overlapping so that the foreign range is in
     /// middle without touching borders
     Inner {
@@ -230,6 +225,12 @@ impl EventHandler<SimpleLineHandlerResult> for SimpleLineHandler {
                 KeyCode::Char('c') if ke.modifiers.contains(KeyModifiers::CONTROL) => {
                     return Some(SimpleLineHandlerResult::Abort);
                 }
+                KeyCode::Char('a') if ke.modifiers.contains(KeyModifiers::CONTROL) => {
+                    buf.move_cursor_to_line_start()
+                }
+                KeyCode::Char('e') if ke.modifiers.contains(KeyModifiers::CONTROL) => {
+                    buf.move_cursor_to_line_end()
+                }
                 KeyCode::Char(c) => buf.insert_char_at_cursor(c),
                 KeyCode::Backspace => buf.delete_char_before_cursor(),
                 KeyCode::Left => buf.move_cursor_by(-1),
@@ -244,50 +245,15 @@ impl EventHandler<SimpleLineHandlerResult> for SimpleLineHandler {
     }
 }
 
-pub fn render(split_tree: &SplitTree) -> io::Result<()> {
-    let term_size = crossterm::terminal::size()?;
-
-    queue!(io::stdout(), Clear(ClearType::All))?;
-    let Some(SplitMap {
-        rects, border_map, ..
-    }) = split_tree.compute_rects(term_size)
-    else {
-        return render_screen_too_small_info();
-    };
-
-    for (rect, buffer) in rects {
-        buffer.render_at(rect)?;
-    }
-
-    let mut stdout = io::stdout();
-    for (row_i, row) in enumerate(border_map.0) {
-        for (col_i, field) in enumerate(row) {
-            if field.in_vertical_border {
-                queue!(
-                    stdout,
-                    cursor::MoveTo(col_i as u16, row_i as u16),
-                    Print("\u{2502}")
-                )?;
-            } else if field.in_horizontal_border {
-                queue!(
-                    stdout,
-                    cursor::MoveTo(col_i as u16, row_i as u16),
-                    Print("\u{2500}")
-                )?;
-            }
-        }
-    }
-
-    stdout.flush()
-}
-
+/// runs a loop that renders the split, hands of events to the handler,
+/// and returns when the handler returns Some(T)
 pub fn edit_buffer<H: EventHandler<T>, T>(
     buf: &BufferRef,
     split_tree: &SplitTree,
     event_handler: &mut H,
 ) -> io::Result<T> {
     loop {
-        render(split_tree)?;
+        split_tree.render()?;
         let ev = event::read()?;
         if let Some(res) = event_handler.handle(&ev, buf) {
             return Ok(res);
@@ -295,25 +261,20 @@ pub fn edit_buffer<H: EventHandler<T>, T>(
     }
 }
 
-fn render_screen_too_small_info() -> Result<(), io::Error> {
-    execute!(
-        io::stdout(),
-        cursor::MoveTo(0, 0),
-        Print("The terminal window is too small to render the ui, please enlarge")
-    )
-}
-
 mod termutils;
 pub use termutils::{with_setup_terminal, SetupError};
 
 mod splittree;
-pub use splittree::{Split, SplitContent, SplitMap, SplitSize, SplitTree};
+pub use splittree::{Split, SplitContent, SplitSize, SplitTree};
 
 mod document;
 pub use document::{Document, DocumentRef};
 
 mod buffer;
-pub use buffer::{Buffer, BufferPosition, BufferRef, View};
+pub use buffer::{Buffer, BufferPosition, BufferRef};
 
 mod atext;
 pub use atext::AText;
+
+/// crossterms event module, use this to get inputs
+pub use crossterm::event as ctevent;
