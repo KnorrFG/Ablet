@@ -1,7 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::BTreeSet,
-    io::{self, Write},
+    io::{self},
     sync::LazyLock,
 };
 
@@ -14,7 +13,7 @@ use persistent_structs::PersistentStruct;
 
 use crate::{shared, AText, Document, DocumentRef, Range, Rect, Shared, Size, StyledRange};
 
-const CURSOR_STYLE: LazyLock<ContentStyle> = LazyLock::new(|| ContentStyle::new().reverse());
+static CURSOR_STYLE: LazyLock<ContentStyle> = LazyLock::new(|| ContentStyle::new().reverse());
 
 #[derive(Clone)]
 pub struct BufferRef(pub(crate) Shared<Buffer>);
@@ -256,7 +255,11 @@ impl View {
 
 /// convert selection to simple range, which is the part of the selection
 /// that is in the current line
-fn to_line_range(selection: &Selection<TextPosition>, i: usize, w: usize) -> Option<Range<usize>> {
+fn to_line_range(
+    _selection: &Selection<TextPosition>,
+    _i: usize,
+    _w: usize,
+) -> Option<Range<usize>> {
     todo!()
 }
 
@@ -272,7 +275,7 @@ fn adjust_for_seletions<'a>(
 
     if let [current_selection, selections @ ..] = selections {
         use crate::OverlapDescription::*;
-        match segment.range.get_overlap_with(&current_selection) {
+        match segment.range.get_overlap_with(current_selection) {
             // no overlap with the current selection, check the rest
             None => adjust_for_seletions(segment, selections),
             // complete overlap with a selection, no need to check remaining selections
@@ -304,7 +307,7 @@ fn adjust_for_seletions<'a>(
                 }];
                 found_selection.extend(adjust_for_seletions(
                     segment.clone().with_range(old_l),
-                    selections.clone(),
+                    selections,
                 ));
                 found_selection.extend(adjust_for_seletions(segment.with_range(old_r), selections));
                 found_selection.sort_unstable_by(|a, b| a.range.start.cmp(&b.range.start));
@@ -385,5 +388,5 @@ impl BufferPosition {
 }
 
 pub struct Selection<T> {
-    range: Range<T>,
+    _range: Range<T>,
 }

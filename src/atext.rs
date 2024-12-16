@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Display, ops::Index};
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use crossterm::style::{ContentStyle, StyledContent};
 use itertools::{enumerate, Itertools};
@@ -13,6 +13,10 @@ pub struct AText {
 }
 
 impl AText {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// returns a list of pairs (range, style) that fall within the given
     /// range. Assumes self is a single line
     pub(crate) fn get_range_style_pairs(&self, r: Range<usize>) -> Vec<StyledRange<usize>> {
@@ -22,7 +26,7 @@ impl AText {
         for chunk in styles_in_range {
             let end = start + chunk.len();
             assert!(
-                chunk.len() > 0,
+                !chunk.is_empty(),
                 "unexpected zero-len chunk in get_range_style_pairs"
             );
             let style = chunk[0];
@@ -49,7 +53,7 @@ impl AText {
         // * concat pre-range with new text, and the result of that with post-range
 
         let mut new_text = new_text.into();
-        if r.len() == 0 {
+        if r.is_empty() {
             if r.start == 0 {
                 new_text += self.clone();
                 *self = new_text;
@@ -65,26 +69,24 @@ impl AText {
                 res += r;
                 *self = res;
             }
+        } else if r.start == 0 {
+            new_text += self.clone();
+            *self = new_text;
+        } else if r.start >= self.text.len() {
+            self.append_text(new_text);
         } else {
-            if r.start == 0 {
-                new_text += self.clone();
-                *self = new_text;
-            } else if r.start >= self.text.len() {
-                self.append_text(new_text);
-            } else {
-                let (Some(l), Some(_)) = self.clone().split_at_index(r.start) else {
-                    panic!("this should be impossible");
-                };
+            let (Some(l), Some(_)) = self.clone().split_at_index(r.start) else {
+                panic!("this should be impossible");
+            };
 
-                let (_, mb_r) = self.clone().split_at_index(r.end);
+            let (_, mb_r) = self.clone().split_at_index(r.end);
 
-                let mut res = l;
-                res += new_text;
-                if let Some(r) = mb_r {
-                    res += r;
-                }
-                *self = res;
+            let mut res = l;
+            res += new_text;
+            if let Some(r) = mb_r {
+                res += r;
             }
+            *self = res;
         }
     }
 
@@ -209,7 +211,7 @@ fn reduce_styles(
     let mut new_styles = vec![];
     for (new_index, (old_index, style)) in enumerate(remaining_styles) {
         mapping.insert(old_index, new_index);
-        new_styles.push(style.clone());
+        new_styles.push(*style);
     }
     (new_styles, mapping)
 }
@@ -242,7 +244,7 @@ impl<T: Display> From<StyledContent<T>> for AText {
         AText {
             text: c,
             style_map: vec![Some(0); len],
-            styles: vec![value.style().clone()],
+            styles: vec![*value.style()],
         }
     }
 }

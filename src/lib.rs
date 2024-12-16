@@ -1,33 +1,25 @@
 use std::{
     borrow::Cow,
-    collections::HashSet,
     io::{self, Write},
-    ops::{RangeBounds, Sub},
+    ops::Sub,
     sync::{Arc, Mutex},
 };
 
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event, KeyCode, KeyModifiers},
     execute, queue,
-    style::{ContentStyle, Print},
+    style::Print,
     terminal::{Clear, ClearType},
 };
 use derive_more::derive::Constructor;
-use itertools::{enumerate, Itertools};
+use itertools::enumerate;
 use persistent_structs::PersistentStruct;
 
 type Shared<T> = Arc<Mutex<T>>;
 
 fn shared<T>(t: T) -> Arc<Mutex<T>> {
     Arc::new(Mutex::new(t))
-}
-
-/// Prompt is a special singleton split used for the primary interraction with the user.
-/// Think command palette, `M-x`, or, indeed, shell's prompt. Maybe we want to display it at the
-/// bottom, like in Emacs, or maybe we want to popup it front and center.
-pub struct Prompt {
-    pub(crate) buffer: BufferRef,
 }
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -93,7 +85,7 @@ pub struct Range<T> {
 
 impl<T: RangeCompatibleNumber<T>> Range<T> {
     pub fn split_at_index(self, v: T) -> (Option<Self>, Option<Self>) {
-        if v.into() <= 0 {
+        if v.into() == 0 {
             (None, Some(self))
         } else if v >= self.end {
             (Some(self), None)
@@ -297,7 +289,7 @@ pub fn edit_buffer<H: EventHandler<T>, T>(
     loop {
         render(split_tree)?;
         let ev = event::read()?;
-        if let Some(res) = event_handler.handle(&ev, &buf) {
+        if let Some(res) = event_handler.handle(&ev, buf) {
             return Ok(res);
         }
     }

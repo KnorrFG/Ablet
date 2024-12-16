@@ -1,7 +1,7 @@
 use std::{collections::HashMap, iter};
 
 use derive_more::Constructor;
-use itertools::{izip, zip, Itertools};
+use itertools::{izip, Itertools};
 
 use crate::{BufferPosition, BufferRef, Orientation, Rect, Size};
 
@@ -22,7 +22,6 @@ pub struct SplitTree {
 pub struct SplitMap {
     pub(crate) rects: HashMap<Rect, BufferRef>,
     pub(crate) border_map: BorderMap,
-    pub(crate) size: Size,
 }
 
 impl SplitTree {
@@ -103,7 +102,7 @@ impl Split {
         min_split_size: Size,
         orientation: Orientation,
     ) -> Option<SplitMap> {
-        assert!(self.sizes.len() > 0, "emtpy splits aren't allowed");
+        assert!(!self.sizes.is_empty(), "emtpy splits aren't allowed");
 
         let fixed_sizes = self
             .sizes
@@ -274,7 +273,6 @@ impl Split {
                     let SplitMap {
                         rects: inner_rects,
                         border_map: inner_border_map,
-                        size: _,
                     } = next_split.compute_rects(rect, min_split_size, orientation.flip())?;
                     border_map.update(inner_border_map, rect.pos);
                     rects.extend(inner_rects.into_iter())
@@ -282,11 +280,7 @@ impl Split {
             }
         }
 
-        Some(SplitMap {
-            rects,
-            border_map,
-            size: rect.size,
-        })
+        Some(SplitMap { rects, border_map })
     }
 }
 

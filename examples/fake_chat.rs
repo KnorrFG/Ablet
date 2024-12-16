@@ -2,17 +2,14 @@ use std::{
     io,
     sync::mpsc::{self, Receiver, TryRecvError},
     thread::{self, sleep},
-    time::{self, Duration, Instant},
+    time::{Duration, Instant},
 };
 
 use ablet::{
     split_tree, with_setup_terminal, AText, Buffer, BufferRef, SimpleLineHandler,
     SimpleLineHandlerResult, SplitTree,
 };
-use crossterm::{
-    event::{Event, KeyCode, KeyEvent},
-    style::Stylize,
-};
+use crossterm::style::Stylize;
 
 fn main() -> Result<(), ablet::SetupError<io::Error>> {
     with_setup_terminal(run)
