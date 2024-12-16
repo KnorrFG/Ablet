@@ -1,8 +1,24 @@
-use crate::{AText, Shared};
+use crate::{shared, AText, Shared};
 
 #[derive(Default)]
 pub struct Document {
     pub(crate) content: AText,
+}
+
+impl Document {
+    pub fn from_text(text: impl Into<AText>) -> Document {
+        Self {
+            content: text.into(),
+        }
+    }
+
+    pub fn new() -> Document {
+        Self::from_text("")
+    }
+
+    pub fn into_ref(self) -> DocumentRef {
+        DocumentRef(shared(self))
+    }
 }
 
 #[derive(Clone)]

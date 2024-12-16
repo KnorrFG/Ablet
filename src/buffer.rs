@@ -12,7 +12,7 @@ use crossterm::{
 use itertools::Itertools;
 use persistent_structs::PersistentStruct;
 
-use crate::{AText, Document, DocumentRef, Range, Rect, Shared, Size, StyledRange};
+use crate::{shared, AText, Document, DocumentRef, Range, Rect, Shared, Size, StyledRange};
 
 const CURSOR_STYLE: LazyLock<ContentStyle> = LazyLock::new(|| ContentStyle::new().reverse());
 
@@ -48,6 +48,10 @@ impl BufferRef {
     pub fn add_line(&self, t: impl Into<AText>) {
         self.0.lock().unwrap().add_line(t)
     }
+
+    pub fn move_cursor_by(&self, offset: isize) {
+        self.0.lock().unwrap().move_cursor_by(offset)
+    }
 }
 
 pub struct Buffer {
@@ -56,6 +60,39 @@ pub struct Buffer {
 }
 
 impl Buffer {
+    pub fn move_cursor_by(&mut self, offset: isize) {
+        let pos = self.view.cursor.0 as isize;
+        self.view.cursor.0 = (pos + offset)
+            .max(0)
+            .min(self.document.0.lock().unwrap().content.len() as isize)
+            as usize;
+    }
+
+    pub fn from_text(text: impl Into<AText>) -> Buffer {
+        Self {
+            document: Document::from_text(text).into_ref(),
+            view: View::default(),
+        }
+    }
+
+    pub fn from_doc(doc: DocumentRef) -> Buffer {
+        Self {
+            document: doc,
+            view: View::default(),
+        }
+    }
+
+    pub fn new() -> Buffer {
+        Self {
+            document: Document::new().into_ref(),
+            view: View::default(),
+        }
+    }
+
+    pub fn into_ref(self) -> BufferRef {
+        BufferRef(shared(self))
+    }
+
     pub fn render_at(&self, rect: Rect) -> io::Result<()> {
         self.view.render_doc(&self.document, rect)?;
         Ok(())
@@ -156,12 +193,19 @@ impl View {
                             )
                         )?;
                     }
+
+                    // make a cursor visible at line end, if it is on a new_line
+                    // this might cause a rendering over a border if a line is max length
+                    // and the cursor is at its end
+                    let mut text_under_cursor =
+                        &atext.text[at_cursor.shortened_to(1).into_native()];
+                    if text_under_cursor == "\n" {
+                        text_under_cursor = " \n";
+                    }
+
                     queue!(
                         stdout,
-                        PrintStyledContent(
-                            CURSOR_STYLE
-                                .apply(&atext.text[at_cursor.shortened_to(1).into_native()])
-                        ),
+                        PrintStyledContent(CURSOR_STYLE.apply(text_under_cursor)),
                         PrintStyledContent(
                             styled_range.style.apply(
                                 &atext.text[at_cursor.update_start(|s| s + 1).into_native()]
@@ -179,6 +223,11 @@ impl View {
                     )?;
                 }
             }
+        }
+
+        // if the cursor is at the end of the document, append a space to visualize it
+        if self.cursor.0 >= atext.len() && self.cursor_visible {
+            queue!(stdout, PrintStyledContent(CURSOR_STYLE.apply(" ")),)?;
         }
         Ok(())
     }

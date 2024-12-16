@@ -1,17 +1,20 @@
 use std::{
     borrow::Cow,
     collections::HashSet,
-    io,
+    io::{self, Write},
     ops::{RangeBounds, Sub},
     sync::{Arc, Mutex},
 };
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent},
-    style::ContentStyle,
+    cursor,
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    execute, queue,
+    style::{ContentStyle, Print},
+    terminal::{Clear, ClearType},
 };
 use derive_more::derive::Constructor;
-use itertools::Itertools;
+use itertools::{enumerate, Itertools};
 use persistent_structs::PersistentStruct;
 
 type Shared<T> = Arc<Mutex<T>>;
@@ -217,14 +220,102 @@ macro_rules! with_cleanup {
     }};
 }
 
+pub trait EventHandler<T> {
+    fn handle(&mut self, ev: &Event, buf: &BufferRef) -> Option<T>;
+}
+
+pub struct SimpleLineHandler;
+
+pub enum SimpleLineHandlerResult {
+    LineDone,
+    Abort,
+}
+
+impl EventHandler<SimpleLineHandlerResult> for SimpleLineHandler {
+    fn handle(&mut self, ev: &Event, buf: &BufferRef) -> Option<SimpleLineHandlerResult> {
+        match ev {
+            Event::Key(ke) => match ke.code {
+                KeyCode::Char('c') if ke.modifiers.contains(KeyModifiers::CONTROL) => {
+                    return Some(SimpleLineHandlerResult::Abort);
+                }
+                KeyCode::Char(c) => buf.insert_char_at_cursor(c),
+                KeyCode::Backspace => buf.delete_char_before_cursor(),
+                KeyCode::Left => buf.move_cursor_by(-1),
+                KeyCode::Right => buf.move_cursor_by(1),
+                KeyCode::Enter => return Some(SimpleLineHandlerResult::LineDone),
+                _ => {}
+            },
+            Event::Paste(text) => buf.insert_text_at_cursor(text.as_str()),
+            _ => {}
+        }
+        None
+    }
+}
+
+pub fn render(split_tree: &SplitTree) -> io::Result<()> {
+    let term_size = crossterm::terminal::size()?;
+
+    queue!(io::stdout(), Clear(ClearType::All))?;
+    let Some(SplitMap {
+        rects, border_map, ..
+    }) = split_tree.compute_rects(term_size)
+    else {
+        return render_screen_too_small_info();
+    };
+
+    for (rect, buffer) in rects {
+        buffer.render_at(rect)?;
+    }
+
+    let mut stdout = io::stdout();
+    for (row_i, row) in enumerate(border_map.0) {
+        for (col_i, field) in enumerate(row) {
+            if field.in_vertical_border {
+                queue!(
+                    stdout,
+                    cursor::MoveTo(col_i as u16, row_i as u16),
+                    Print("\u{2502}")
+                )?;
+            } else if field.in_horizontal_border {
+                queue!(
+                    stdout,
+                    cursor::MoveTo(col_i as u16, row_i as u16),
+                    Print("\u{2500}")
+                )?;
+            }
+        }
+    }
+
+    stdout.flush()
+}
+
+pub fn edit_buffer<H: EventHandler<T>, T>(
+    buf: &BufferRef,
+    split_tree: &SplitTree,
+    event_handler: &mut H,
+) -> io::Result<T> {
+    loop {
+        render(split_tree)?;
+        let ev = event::read()?;
+        if let Some(res) = event_handler.handle(&ev, &buf) {
+            return Ok(res);
+        }
+    }
+}
+
+fn render_screen_too_small_info() -> Result<(), io::Error> {
+    execute!(
+        io::stdout(),
+        cursor::MoveTo(0, 0),
+        Print("The terminal window is too small to render the ui, please enlarge")
+    )
+}
+
 mod termutils;
 pub use termutils::{with_setup_terminal, SetupError};
 
 mod splittree;
-pub use splittree::{Split, SplitContent, SplitMap, SplitTree};
-
-mod ablet_type;
-pub use ablet_type::{Ablet, EventHandler, SimpleLineHandler, SimpleLineHandlerResult};
+pub use splittree::{Split, SplitContent, SplitMap, SplitSize, SplitTree};
 
 mod document;
 pub use document::{Document, DocumentRef};

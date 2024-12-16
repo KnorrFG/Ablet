@@ -6,36 +6,40 @@ use std::{
 };
 
 use ablet::{
-    split_tree, with_setup_terminal, AText, Ablet, SimpleLineHandler, SimpleLineHandlerResult,
+    split_tree, with_setup_terminal, AText, Buffer, BufferRef, SimpleLineHandler,
+    SimpleLineHandlerResult, SplitTree,
 };
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::{
+    event::{Event, KeyCode, KeyEvent},
+    style::Stylize,
+};
 
 fn main() -> Result<(), ablet::SetupError<io::Error>> {
     with_setup_terminal(run)
 }
 
 fn run() -> io::Result<()> {
-    let mut ablet = Ablet::new();
-    let def_buffer = ablet.default_buffer_get();
-    let prompt_buffer = ablet.prompt_buffer_get();
+    let def_buffer = Buffer::new().into_ref();
+    let prompt_buffer = Buffer::new().into_ref();
     let prompt_doc = prompt_buffer.get_doc();
+    prompt_buffer.set_cursor_visible(true);
 
     let tree = split_tree! {
         Vertical: {
-            1: def_buffer
+            1: def_buffer,
+            1!: prompt_buffer,
         }
     };
-    ablet.split_tree_set(tree);
 
     let (tx_kill, rx_kill) = mpsc::sync_channel::<()>(1);
-    start_background_thread(ablet.clone(), rx_kill);
+    start_background_thread(tree.clone(), def_buffer.clone(), rx_kill);
 
     let mut handler = SimpleLineHandler;
     loop {
         use SimpleLineHandlerResult::*;
-        match ablet.edit_prompt(&mut handler)? {
+        match ablet::edit_buffer(&prompt_buffer, &tree, &mut handler)? {
             LineDone => {
-                def_buffer.add_line(AText::from("> ") + prompt_doc.take());
+                def_buffer.add_line(AText::from("> ".grey()) + prompt_doc.take());
             }
             Abort => {
                 _ = tx_kill.send(());
@@ -45,9 +49,8 @@ fn run() -> io::Result<()> {
     }
 }
 
-fn start_background_thread(ablet: ablet::Ablet, rx_kill: Receiver<()>) {
+fn start_background_thread(splits: SplitTree, buf: BufferRef, rx_kill: Receiver<()>) {
     thread::spawn(move || {
-        let buf = ablet.default_buffer_get();
         let mut last_msg_ts = Instant::now();
         loop {
             sleep(Duration::from_millis(1));
@@ -57,8 +60,8 @@ fn start_background_thread(ablet: ablet::Ablet, rx_kill: Receiver<()>) {
 
             let now = Instant::now();
             if now.duration_since(last_msg_ts) > Duration::from_secs(2) {
-                buf.add_line(format!("Hello at {now:?}"));
-                ablet.render().unwrap();
+                buf.add_line(AText::from("< ".green()) + "Hello at " + format!("{now:?}").yellow());
+                ablet::render(&splits).unwrap();
                 last_msg_ts = now;
             }
         }

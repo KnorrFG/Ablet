@@ -1,8 +1,6 @@
 ---
 source: src/atext.rs
-assertion_line: 305
 expression: foo
-snapshot_kind: text
 ---
 AText {
     text: "Oh, Hello!",
