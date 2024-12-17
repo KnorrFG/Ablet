@@ -5,7 +5,7 @@ It's inspired by [Matklad's design for Abont](https://github.com/matklad/abont).
 In most cases the budget alternative to having a DSL is having a library, so that's
 what I made here. 
 
-The library provides Buffers, Documents and Splits. A buffer holds a document,
+The library provides buffers, documents and splits. A buffer holds a document,
 which contains stylized text. Buffers can be arranged into a split tree, which can then
 be rendered. Additionally, there is a very simple line editor that is part of this 
 library, that you can use to edit (single line) buffers. Furthermore, everything
@@ -103,46 +103,59 @@ of ideas and issues I'm aware of:
 
 ### Low-hanging fruits
 
-A multiline editor
-: Should be quite easy, just look at the implementation of the line editor. Currently,
+#### A multiline editor
+
+Should be quite easy, just look at the implementation of the line editor. Currently,
 its located in lib.rs. Also, a Vim-like editor would be nice.
 
-More cursor functions
-: Also quite easy, these would be implemented in the Buffer type, in buffers.rs. Examples
-would be move by word (forward and backward), get a range of the line that contains the
-cursor, move by line
+#### More cursor functions
 
-Mouse Interactions
-: There is a type called `SplitMap`, currently private to the crate, that could be exposed,
-and gain a method that converts click coordinates to buffer coordinates and return those
-together with an identifier for the buffer. This would of course first require adding
-a field for an identifier to the Buffer type. A buffer position could convert to a text
-position given the size of the buffer, at which point you know what the user clicked.
+Also quite easy, these would be implemented in the Buffer type, in buffers.rs. Examples
+would be 
+- move by word (forward and backward),
+- get a range of the line that contains the cursor 
+- move by line
+
+Related to this a function in `AText` to modify the style of a range would be useful.
+
+#### Mouse Interactions
+
+There is a type called `SplitMap`, it maps concrete rectangles to buffer.
+Currently private to the crate, that could be exposed, and gain a method that
+converts click coordinates to buffer coordinates and return those together with
+an identifier for the buffer. This would of course first require adding a field
+for an identifier to the Buffer type. A buffer position could convert to a text
+position given the size of the buffer, at which point you know what the user
+clicked.
 
 ### Harder Things
 
-Line Wrap & Selections
-: This would complicate the render logic quite a bit, and `View::render_doc` which this
+#### Line Wrap & Selections
+
+This would complicate the render logic quite a bit, and `View::render_doc` which this
 ultimately comes down to is already complex enough to give me nightmares.
 There is already some code that respects selections, but it's unused and untested so far,
 and you'd need to write more code first to be even able to use it.
 
-Windows Line Endings
-: I'm a linux user, and while this crate uses crossterm (which is platform independent),
+#### Windows Line Endings
+
+I'm a linux user, and while this crate uses crossterm (which is platform independent),
 it will probably not work on Windows, since on Windows a line ending is "\r\n", and on linux
 it's just '\n'. All code just assumes Linux line endings, and unless all terminals in 
 Windows insert Linux line endings, this won't work.
 
-Unicode
-: Text is hard. I wanted to get this done quickly. All code assumes ASCII characters. 
+#### Unicode
+
+Text is hard. I wanted to get this done quickly. All code assumes ASCII characters. 
 Inputting a non ASCII character will crash your program. Since rust strings are by default
 utf-8 this can probably be fixed by replacing all string slices with 
 `.chars().dropping(start).take(end - start)`. The harder part is then cursor management
 because you want the cursor on a grapheme cluster, which can be composed of multiple
 utf-8 scalars, which is what is returned by `chars()`.
 
-String inefficiency
-: The text type `AText` which represents styled text does it the following way:
+#### String inefficiency
+
+The text type `AText` which represents styled text does it the following way:
 it has a string and two vectors. The string holds the text one vector holds
 text styles, and the other one holds an index into the styles vector for
 each character in the string. This is a simple implementation, but it is very
