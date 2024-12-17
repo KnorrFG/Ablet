@@ -156,9 +156,11 @@ utf-8 scalars, which is what is returned by `chars()`.
 #### String inefficiency
 
 The text type `AText` which represents styled text does it the following way:
-it has a string and two vectors. The string holds the text one vector holds
-text styles, and the other one holds an index into the styles vector for
+it has a string and two vectors. The string holds the text. One vector holds
+the text styles 
+([`crossterm::ContentStyle`](https://docs.rs/crossterm/latest/crossterm/style/struct.ContentStyle.html)), 
+and the other one holds an index into the styles vector for
 each character in the string. This is a simple implementation, but it is very
-inefficient for big amounts of text. I haven't looked into what text  editors
+inefficient for big amounts of text. I haven't looked into what text editors
 do, but there is definitely much room for improvement.
 
